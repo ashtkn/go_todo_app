@@ -15,7 +15,7 @@ func TestRepository_ListTask(t *testing.T) {
 
 	tx, err := testutil.OpenDBForTest(t).BeginTxx(ctx, nil)
 	// テストケースが完了したらロールバックする
-	t.Cleanup(func() { tx.Rollback() })
+	t.Cleanup(func() { _ = tx.Rollback() })
 	if err != nil {
 		t.Fatal(err)
 	}
