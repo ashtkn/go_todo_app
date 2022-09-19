@@ -1,4 +1,7 @@
 {
+  "files.associations": {
+    "*.json.golden": "json"
+},
   "cSpell.words": [
     "errgroup"
   ]
