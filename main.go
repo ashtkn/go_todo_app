@@ -7,16 +7,26 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/ashtkn/go_todo_app/config"
 	"golang.org/x/sync/errgroup"
 )
 
 func run(ctx context.Context) error {
+	// Handle SIGTERM
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Load config
 	cfg, err := config.New()
 	if err != nil {
 		return err
 	}
+
+	// Create server
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		log.Fatalf("failed to listen port %d: %v", cfg.Port, err)
@@ -27,6 +37,7 @@ func run(ctx context.Context) error {
 
 	s := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(5 * time.Second)
 			fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
 		}),
 	}
@@ -40,7 +51,8 @@ func run(ctx context.Context) error {
 	})
 
 	<-ctx.Done()
-	if err := s.Shutdown(ctx); err != nil {
+
+	if err := s.Shutdown(context.Background()); err != nil {
 		log.Printf("failed to shutdown: %+v", err)
 	}
 	return eg.Wait()
