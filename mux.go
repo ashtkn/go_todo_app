@@ -30,14 +30,20 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 	clocker := clock.RealClocker{}
 	r := store.Repository{Clocker: clocker}
 
-	// POST /tasks
+	// Validator
 	v := validator.New()
+
+	// POST /tasks
 	at := &handler.AddTask{Service: &service.AddTask{DB: db, Repo: &r}, Validator: v}
 	mux.Post("/tasks", at.ServeHTTP)
 
 	// GET /tasks
 	lt := &handler.ListTask{Service: &service.ListTask{DB: db, Repo: &r}}
 	mux.Get("/tasks", lt.ServeHTTP)
+
+	// POST /register
+	ru := &handler.RegisterUser{Service: &service.RegisterUser{DB: db, Repo: &r}, Validator: v}
+	mux.Post("/register", ru.ServeHTTP)
 
 	return mux, cleanup, nil
 }
