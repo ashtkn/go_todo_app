@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ashtkn/go_todo_app/auth"
 	"github.com/ashtkn/go_todo_app/clock"
 	"github.com/ashtkn/go_todo_app/config"
 	"github.com/ashtkn/go_todo_app/handler"
@@ -44,6 +45,18 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 	// POST /register
 	ru := &handler.RegisterUser{Service: &service.RegisterUser{DB: db, Repo: &r}, Validator: v}
 	mux.Post("/register", ru.ServeHTTP)
+
+	// POST /login
+	redisCli, err := store.NewKVS(ctx, cfg)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	tokenGenerator, err := auth.NewJWTer(redisCli, clocker)
+	if err != nil {
+		return nil, cleanup, err
+	}
+	lu := &handler.Login{Service: &service.Login{DB: db, Repo: &r, TokenGenerator: tokenGenerator}, Validator: v}
+	mux.Post("/login", lu.ServeHTTP)
 
 	return mux, cleanup, nil
 }
