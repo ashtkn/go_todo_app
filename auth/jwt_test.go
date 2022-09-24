@@ -3,11 +3,20 @@ package auth
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/ashtkn/go_todo_app/clock"
 	"github.com/ashtkn/go_todo_app/entity"
 	"github.com/ashtkn/go_todo_app/testutil/fixture"
+	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 func TestEmbed(t *testing.T) {
@@ -43,5 +52,57 @@ func TestJWTer_GenerateToken(t *testing.T) {
 	}
 	if len(got) == 0 {
 		t.Errorf("token is empty")
+	}
+}
+
+func TestJWTer_GetToken(t *testing.T) {
+	t.Parallel()
+
+	c := clock.FixedClocker{}
+	want, err := jwt.NewBuilder().
+		JwtID(uuid.New().String()).
+		Issuer("github.com/ashtkn/go_todo_app").
+		Subject("access_token").
+		IssuedAt(c.Now()).
+		Expiration(c.Now().Add(30*time.Minute)).
+		Claim(RoleKey, "test").
+		Claim(UserNameKey, "test_user").
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	privateKey, err := jwk.ParseKey(rawPrivateKey, jwk.WithPEM(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signed, err := jwt.Sign(want, jwt.WithKey(jwa.RS256, privateKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	moq := &StoreMock{}
+	moq.LoadFunc = func(ctx context.Context, key string) (entity.UserID, error) {
+		return entity.UserID(20), nil
+	}
+
+	sut, err := NewJWTer(moq, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "https://github.com/ashtkn", nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", signed))
+
+	got, err := sut.GetToken(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("GetToken(): want %v, but got %v", want, got)
 	}
 }
