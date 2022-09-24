@@ -31,31 +31,36 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 	clocker := clock.RealClocker{}
 	r := store.Repository{Clocker: clocker}
 
+	kvsDb, err := store.NewKVS(ctx, cfg)
+	if err != nil {
+		return nil, cleanup, err
+	}
+
+	// JWTer
+	jwter, err := auth.NewJWTer(kvsDb, clocker)
+
 	// Validator
 	v := validator.New()
 
-	// POST /tasks
+	// GET/POST Tasks
 	at := &handler.AddTask{Service: &service.AddTask{DB: db, Repo: &r}, Validator: v}
-	mux.Post("/tasks", at.ServeHTTP)
-
-	// GET /tasks
 	lt := &handler.ListTask{Service: &service.ListTask{DB: db, Repo: &r}}
-	mux.Get("/tasks", lt.ServeHTTP)
+	mux.Route("/tasks", func(r chi.Router) {
+		r.Use(handler.AuthMiddleware(jwter))
+		mux.Post("/tasks", at.ServeHTTP)
+		mux.Get("/tasks", lt.ServeHTTP)
+	})
 
 	// POST /register
 	ru := &handler.RegisterUser{Service: &service.RegisterUser{DB: db, Repo: &r}, Validator: v}
 	mux.Post("/register", ru.ServeHTTP)
 
 	// POST /login
-	redisCli, err := store.NewKVS(ctx, cfg)
+
 	if err != nil {
 		return nil, cleanup, err
 	}
-	tokenGenerator, err := auth.NewJWTer(redisCli, clocker)
-	if err != nil {
-		return nil, cleanup, err
-	}
-	lu := &handler.Login{Service: &service.Login{DB: db, Repo: &r, TokenGenerator: tokenGenerator}, Validator: v}
+	lu := &handler.Login{Service: &service.Login{DB: db, Repo: &r, TokenGenerator: jwter}, Validator: v}
 	mux.Post("/login", lu.ServeHTTP)
 
 	return mux, cleanup, nil
