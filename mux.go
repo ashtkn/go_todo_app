@@ -38,17 +38,29 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 
 	// JWTer
 	jwter, err := auth.NewJWTer(kvsDb, clocker)
+	if err != nil {
+		return nil, cleanup, err
+	}
 
 	// Validator
 	v := validator.New()
 
-	// GET/POST Tasks
+	// GET/POST /tasks
 	at := &handler.AddTask{Service: &service.AddTask{DB: db, Repo: &r}, Validator: v}
 	lt := &handler.ListTask{Service: &service.ListTask{DB: db, Repo: &r}}
 	mux.Route("/tasks", func(r chi.Router) {
 		r.Use(handler.AuthMiddleware(jwter))
-		mux.Post("/tasks", at.ServeHTTP)
-		mux.Get("/tasks", lt.ServeHTTP)
+		r.Post("/", at.ServeHTTP)
+		r.Get("/", lt.ServeHTTP)
+	})
+
+	// GET /admin
+	mux.Route("/admin", func(r chi.Router) {
+		r.Use(handler.AuthMiddleware(jwter), handler.AdminMiddleware)
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_, _ = w.Write([]byte(`{"message": "admin only"}`))
+		})
 	})
 
 	// POST /register
@@ -56,10 +68,6 @@ func NewMux(ctx context.Context, cfg *config.Config) (http.Handler, func(), erro
 	mux.Post("/register", ru.ServeHTTP)
 
 	// POST /login
-
-	if err != nil {
-		return nil, cleanup, err
-	}
 	lu := &handler.Login{Service: &service.Login{DB: db, Repo: &r, TokenGenerator: jwter}, Validator: v}
 	mux.Post("/login", lu.ServeHTTP)
 
