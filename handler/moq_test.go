@@ -19,7 +19,7 @@ var _ ListTaskService = &ListTaskServiceMock{}
 //
 //		// make and configure a mocked ListTaskService
 //		mockedListTaskService := &ListTaskServiceMock{
-//			ListTaskFunc: func(ctx context.Context) (entity.Task, error) {
+//			ListTaskFunc: func(ctx context.Context) (entity.Tasks, error) {
 //				panic("mock out the ListTask method")
 //			},
 //		}
@@ -30,7 +30,7 @@ var _ ListTaskService = &ListTaskServiceMock{}
 //	}
 type ListTaskServiceMock struct {
 	// ListTaskFunc mocks the ListTask method.
-	ListTaskFunc func(ctx context.Context) (entity.Task, error)
+	ListTaskFunc func(ctx context.Context) (entity.Tasks, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -44,7 +44,7 @@ type ListTaskServiceMock struct {
 }
 
 // ListTask calls ListTaskFunc.
-func (mock *ListTaskServiceMock) ListTask(ctx context.Context) (entity.Task, error) {
+func (mock *ListTaskServiceMock) ListTask(ctx context.Context) (entity.Tasks, error) {
 	if mock.ListTaskFunc == nil {
 		panic("ListTaskServiceMock.ListTaskFunc: method is nil but ListTaskService.ListTask was just called")
 	}
@@ -85,7 +85,7 @@ var _ AddTaskService = &AddTaskServiceMock{}
 //
 //		// make and configure a mocked AddTaskService
 //		mockedAddTaskService := &AddTaskServiceMock{
-//			AddTaskFunc: func(ctx context.Context, task entity.Task) (*entity.Task, error) {
+//			AddTaskFunc: func(ctx context.Context, title string) (*entity.Task, error) {
 //				panic("mock out the AddTask method")
 //			},
 //		}
@@ -96,7 +96,7 @@ var _ AddTaskService = &AddTaskServiceMock{}
 //	}
 type AddTaskServiceMock struct {
 	// AddTaskFunc mocks the AddTask method.
-	AddTaskFunc func(ctx context.Context, task entity.Task) (*entity.Task, error)
+	AddTaskFunc func(ctx context.Context, title string) (*entity.Task, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -104,29 +104,29 @@ type AddTaskServiceMock struct {
 		AddTask []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Task is the task argument value.
-			Task entity.Task
+			// Title is the title argument value.
+			Title string
 		}
 	}
 	lockAddTask sync.RWMutex
 }
 
 // AddTask calls AddTaskFunc.
-func (mock *AddTaskServiceMock) AddTask(ctx context.Context, task entity.Task) (*entity.Task, error) {
+func (mock *AddTaskServiceMock) AddTask(ctx context.Context, title string) (*entity.Task, error) {
 	if mock.AddTaskFunc == nil {
 		panic("AddTaskServiceMock.AddTaskFunc: method is nil but AddTaskService.AddTask was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Task entity.Task
+		Ctx   context.Context
+		Title string
 	}{
-		Ctx:  ctx,
-		Task: task,
+		Ctx:   ctx,
+		Title: title,
 	}
 	mock.lockAddTask.Lock()
 	mock.calls.AddTask = append(mock.calls.AddTask, callInfo)
 	mock.lockAddTask.Unlock()
-	return mock.AddTaskFunc(ctx, task)
+	return mock.AddTaskFunc(ctx, title)
 }
 
 // AddTaskCalls gets all the calls that were made to AddTask.
@@ -134,12 +134,12 @@ func (mock *AddTaskServiceMock) AddTask(ctx context.Context, task entity.Task) (
 //
 //	len(mockedAddTaskService.AddTaskCalls())
 func (mock *AddTaskServiceMock) AddTaskCalls() []struct {
-	Ctx  context.Context
-	Task entity.Task
+	Ctx   context.Context
+	Title string
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Task entity.Task
+		Ctx   context.Context
+		Title string
 	}
 	mock.lockAddTask.RLock()
 	calls = mock.calls.AddTask
