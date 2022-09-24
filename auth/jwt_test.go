@@ -12,6 +12,7 @@ import (
 
 	"github.com/ashtkn/go_todo_app/clock"
 	"github.com/ashtkn/go_todo_app/entity"
+	"github.com/ashtkn/go_todo_app/store"
 	"github.com/ashtkn/go_todo_app/testutil/fixture"
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -104,5 +105,83 @@ func TestJWTer_GetToken(t *testing.T) {
 
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("GetToken(): want %v, but got %v", want, got)
+	}
+}
+
+type FixedTomorrowClocker struct{}
+
+func (c FixedTomorrowClocker) Now() time.Time {
+	return clock.FixedClocker{}.Now().Add(24 * time.Hour)
+}
+
+func TestJWTer_GetToken_NG(t *testing.T) {
+	t.Parallel()
+
+	c := clock.FixedClocker{}
+	token, err := jwt.NewBuilder().
+		JwtID(uuid.New().String()).
+		Issuer(`github.com/ashtkn/go_todo_app`).
+		Subject("access_token").
+		IssuedAt(c.Now()).
+		Expiration(c.Now().Add(30*time.Minute)).
+		Claim(RoleKey, "test").
+		Claim(UserNameKey, "test_user").
+		Build()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	privateKey, err := jwk.ParseKey(rawPrivateKey, jwk.WithPEM(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256, privateKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type moq struct {
+		userID entity.UserID
+		err    error
+	}
+	tests := map[string]struct {
+		c   clock.Clocker
+		moq moq
+	}{
+		"expire": {
+			c: FixedTomorrowClocker{},
+		},
+		"notFoundInStore": {
+			c:   clock.FixedClocker{},
+			moq: moq{err: store.ErrNotFound},
+		},
+	}
+	for n, tt := range tests {
+		tt := tt
+		t.Run(n, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			moq := &StoreMock{}
+			moq.LoadFunc = func(ctx context.Context, key string) (entity.UserID, error) {
+				return tt.moq.userID, tt.moq.err
+			}
+			sut, err := NewJWTer(moq, tt.c)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "https://github.com/ashtkn", nil)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", signed))
+			got, err := sut.GetToken(ctx, req)
+			if err == nil {
+				t.Errorf("want error, but got nil")
+			}
+			if got != nil {
+				t.Errorf("want nil, but got %v", got)
+			}
+		})
 	}
 }
