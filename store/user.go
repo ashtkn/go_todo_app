@@ -31,3 +31,13 @@ func (r *Repository) RegisterUser(ctx context.Context, db Execer, u *entity.User
 
 	return nil
 }
+
+func (r *Repository) GetUser(ctx context.Context, db Queryer, name string) (*entity.User, error) {
+	u := &entity.User{}
+
+	sql := `SELECT id, name, password, role, created, modified FROM user WHERE name = ?`
+	if err := db.GetContext(ctx, u, sql, name); err != nil {
+		return nil, err
+	}
+	return u, nil
+}

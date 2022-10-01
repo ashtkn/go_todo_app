@@ -12,13 +12,18 @@ services:
       TODO_DB_PORT: 3306
       TODO_DB_USER: todo
       TODO_DB_PASSWORD: todo
-      TODO_DB_DATABASE: todo
+      TODO_DB_NAME: todo
       TODO_REDIS_HOST: todo-redis
       TODO_REDIS_PORT: 6379
     volumes:
       - .:/app
     ports:
       - "18000:8080"
+    depends_on:
+      todo-db:
+        condition: service_healthy
+      todo-redis:
+        condition: service_healthy
 
   todo-db:
     image: mysql:8.0.30
@@ -34,6 +39,11 @@ services:
       - $PWD/_tools/mysql/conf.d:/etc/mysql/conf.d:cached
     ports:
       - "33306:3306"
+    healthcheck:
+      test: "mysqladmin ping -h localhost"
+      interval: 20s
+      timeout: 10s
+      retries: 10
 
   todo-redis:
     image: redis:latest
@@ -42,6 +52,11 @@ services:
       - "36379:6379"
     volumes:
       - todo-redis-data:/data
+    healthcheck:
+      test: "redis-cli ping"
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   todo-db-data:
