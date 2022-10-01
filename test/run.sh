@@ -5,10 +5,6 @@ cd ${script_dir}
 
 set -o xtrace
 
-# Note:
-# MySQLへのコネクションに失敗するときはgotodoappのみを再起動すること
-# MySQLサーバー初期化前にGoが接続しにいってしまうことが原因
-
 # GET /health
 curl -s -X GET localhost:18000/health | jq .
 
